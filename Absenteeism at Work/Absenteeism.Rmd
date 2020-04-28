@@ -1,0 +1,398 @@
+---
+title: "R Notebook"
+output:
+  html_document:
+    df_print: paged
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r}
+plot(cars)
+```
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
+```{r}
+# load the libraries
+library(ggplot2) # visualization
+library(dplyr) # data manipulation
+library(VIM)
+library(data.table)
+library(caret)
+library(dummies)
+library(cluster)
+library(dendextend)
+library(datasets)
+library(NbClust)
+library(heatmaply)
+```
+```{r}
+# load the data
+absent1 <- read.csv("file:///C:/Users/Windows User/Desktop/Data Mining/Absenteeism_at_work.csv", header = TRUE)
+absent1
+```
+```{r}
+str(absent1)
+```
+```{r}
+# All the variables for in the integer form.
+# Converting the integer variables into factors
+
+# change data types from character vectors to numeric
+nominal <- c(2, 4:5, 12:13, 15:16)
+
+# First convert everything to numeric
+absent1[, 1:21] <- lapply(absent1[, 1:21], as.numeric)
+
+#check if converted
+str(absent1)
+```
+
+```{r}
+# how many missing values.
+sum(is.na(absent1))
+```
+```{r}
+# Lets check correlations , see - nomvars to exclude nominal variables
+corrmatrix_absent1<- cor(absent1, use = "pairwise.complete.obs")
+corrmatrix_absent1
+```
+```{r}
+# Descriptive statistics
+summary(absent1)
+```
+
+```{r}
+# generating 1 way frequency table
+library(plyr)
+library(plotly)
+fcount<- count(absent1,'ID')
+fcount
+summary(fcount)
+
+#fcountID<- count(absent1,'ID')
+#fcountID
+#summary(fcountID)
+boxplot(fcount)
+```
+
+```{r}
+# based on the results of the frequency table, we can identify individuals who have the highest frequency.
+# Clustering can be done on IDs and patterns can be identified to know 
+```
+```{r}
+#-----k-means-------#
+kclusters <- kmeans(absent1$ID, 5, nstart = 25)
+plot(absent1[,c(1,21)], col = kclusters$cluster)
+kclusters
+
+kclusters7 <- kmeans(absent1$ID, 7, nstart = 25)
+plot(absent1[,c(1,21)], col = kclusters7$cluster)
+kclusters7
+
+```
+```{r}
+#See the clusters
+kclusters$cluster
+table(kclusters$cluster)
+kclusters$size
+
+# Get sum of squares within clusters and between clusters
+kclusters$withinss
+kclusters$tot.withinss
+kclusters$betweenss
+
+#See the clusters
+kclusters7$cluster
+table(kclusters7$cluster)
+kclusters7$size
+
+# Get sum of squares within clusters and between clusters
+kclusters7$withinss
+kclusters7$tot.withinss
+kclusters7$betweenss
+```
+```{r}
+# Whats the best number?
+bestK <- NbClust(absent1, min.nc=2, max.nc=15, method="kmeans")
+bestK$Best.nc
+
+```
+
+```{r}
+# by looking at the graphs - the best number of clusters is 4
+# running kmeans again with 4 clusters
+
+kclusters4 <- kmeans(absent1$ID, 4, nstart = 25)
+plot(absent1[,c(1,21)], col = kclusters4$cluster)
+kclusters4
+
+#See the clusters
+kclusters4$cluster
+table(kclusters4$cluster)
+kclusters4$size
+
+# Get sum of squares within clusters and between clusters
+kclusters4$withinss
+kclusters4$tot.withinss
+kclusters4$betweenss
+```
+```{r}
+# Analyzing Cluster 2 and Cluster 4 with respect to Hit Target, Work Load, Reasons for Absense
+# Using Kmeans
+#combine data with clusters
+aabsent <- cbind(absent1, kclusters4$cluster)
+View(aabsent)
+colnames(aabsent)[21] <- "cluster"
+class(aabsent)
+newdf <- as.data.frame(aabsent)
+View(newdf)
+
+```
+```{r}
+# Cluster size 
+clsize <- kclusters4$size
+clsize
+clsizeperentage <- clsize[1:4]/sum(clsize)*100
+clsizeperentage
+
+```
+```{r}
+#Cluster analysis - work load 
+cl1 <- subset(newdf, newdf$cluster == "1")
+head(cl1)
+nrow(cl1)
+cl1work <- sum(cl1$Work.load.Average.day)
+cl1work
+
+cl2 <- subset(newdf, newdf$cluster == "2")
+head(cl2)
+nrow(cl2)
+cl2work <- sum(cl2$Work.load.Average.day)
+cl2work
+
+cl3 <- subset(newdf, newdf$cluster == "3")
+head(cl3)
+nrow(cl3)
+cl3work <- sum(cl3$Work.load.Average.day)
+cl3work
+
+cl4 <- subset(newdf, newdf$cluster == "4")
+head(cl4)
+nrow(cl4)
+cl4work <- sum(cl4$Work.load.Average.day)
+cl4work
+```
+```{r}
+# total work load
+totalwork <- sum(absent1$Work.load.Average.day)
+
+#cluster work load percentage
+cl1workper <- cl1work/totalwork*100
+cl2workper <- cl2work/totalwork*100
+cl3workper <- cl3work/totalwork*100
+cl4workper <- cl4work/totalwork*100
+
+#print cluster work load percentage
+all <- c("cluster1", "cluster2", "cluster3", "cluster4")
+workper <- c(cl1workper, cl2workper, cl3workper, cl4workper)
+print(data.frame(all, workper))
+
+pie(workper)
+
+```
+```{r}
+#Cluster analysis - hit target
+cl1hit <- sum(cl1$Hit.target)
+cl1hit
+
+cl2hit <- sum(cl2$Hit.target)
+cl2hit
+
+cl3hit <- sum(cl3$Hit.target)
+cl3hit
+
+cl4hit <- sum(cl4$Hit.target)
+cl4hit
+
+# total hit targets
+totalhit <- sum(absent1$Hit.target)
+
+#cluster hit target percentage
+cl1hitper <- cl1hit/totalhit*100
+cl2hitper <- cl2hit/totalhit*100
+cl3hitper <- cl3hit/totalhit*100
+cl4hitper <- cl4hit/totalhit*100
+
+#print cluster hit target percentage
+allhit <- c("cluster1", "cluster2", "cluster3", "cluster4")
+hitper <- c(cl1hitper, cl2hitper, cl3hitper, cl4hitper)
+print(data.frame(allhit, hitper))
+
+```
+```{r}
+barplot(hitper)
+```
+
+```{r}
+# Cluster 4 does not have that much of work load as compared to cluster 2 still their hit target is less
+# there can be other factors that is affecting cluster 4 productivity
+# lets look at travel expense, son for cluster 2 and 4 for further analysis
+```
+
+```{r}
+# Travel Expense
+#Cluster analysis - Travel Exp
+cl2exp <- sum(cl2$Transportation.expense)
+cl2exp
+
+cl4exp <- sum(cl4$Transportation.expense)
+cl4exp
+
+cl3exp <- sum(cl3$Transportation.expense)
+cl3exp
+
+cl1exp <- sum(cl1$Transportation.expense)
+cl1exp
+# total hit targets
+totalexp <- sum(absent1$Transportation.expense)
+
+#cluster travel exp percentage
+cl2expper <- cl2exp/totalexp*100
+cl4expper <- cl4exp/totalexp*100
+cl1expper <- cl1exp/totalexp*100
+cl3expper <- cl3exp/totalexp*100
+
+#printing cluster travel exp percentage
+allexp <- c("cluster1","cluster2", "cluster3", "cluster4")
+expper <- c(cl1expper, cl2expper, cl3expper, cl4expper)
+print(data.frame(allexp, expper))
+
+
+pie(expper)
+```
+```{r}
+#Cluster analysis - Reason for Absense - (26) Unjustified Absense
+cl2un <- sum(cl2$Reason.for.absence == '26')
+cl2un
+
+cl4un <- sum(cl4$Reason.for.absence == '26')
+cl4un
+
+cl1un <- sum(cl1$Reason.for.absence == '26')
+cl1un
+
+cl3un <- sum(cl3$Reason.for.absence == '26')
+cl3un
+
+# total Unjustified absenses
+totalun <- sum(absent1$Reason.for.absence == '26')
+
+#cluster unjustified absenses
+cl2unper <- cl2un/totalun*100
+cl4unper <- cl4un/totalun*100
+cl1unper <- cl1un/totalun*100
+cl3unper <- cl3un/totalun*100
+
+#print cluster unjustified absenses percentage
+allun <- c("cluster1","cluster2", "cluster3", "cluster4")
+unper <- c(cl1unper, cl2unper, cl3unper, cl4unper)
+print(data.frame(allun, unper))
+pie(unper)
+```
+```{r}
+# Checking for cluster 1 and 3 even though the absenteeism is not so much
+cl1un <- sum(cl1$Reason.for.absence == '26')
+cl1un
+
+cl3un <- sum(cl3$Reason.for.absence == '26')
+cl3un
+
+# total Unjustified absenses
+totalun <- sum(absent1$Reason.for.absence == '26')
+
+#cluster unjustified absenses
+cl1unper <- cl1un/totalun*100
+cl3unper <- cl3un/totalun*100
+
+#print cluster unjustified absenses percentage
+allun <- c("cluster1","cluster3")
+unper <- c(cl1unper, cl3unper)
+print(data.frame(allun, unper))
+```
+```{r}
+# just checking the reason for absence in cluster 2
+fcount2<- count(absent1,'Reason.for.absence')
+fcount2
+summary(fcount2)
+
+
+```
+```{r}
+# Reason 14, 23 and 28 have the highest frequency
+# Lets check the main reason for absence in cluster 2
+
+cl214 <- sum(cl2$Reason.for.absence == '14')
+cl214
+
+cl223 <- sum(cl2$Reason.for.absence == '23')
+cl223
+
+cl228 <- sum(cl2$Reason.for.absence == '28')
+cl228
+
+# total
+total23 <- sum(absent1$Reason.for.absence == '23')
+total14 <- sum(absent1$Reason.for.absence == '14')
+total28 <- sum(absent1$Reason.for.absence == '28')
+
+#cluster unjustified absenses
+cl214 <- cl214/total14*100
+cl223 <- cl223/total23*100
+cl228 <- cl228/total28*100
+
+#print cluster unjustified absenses percentage
+allr <- c("Reason 14","Reason 23", "Reason 28")
+rper <- c(cl214, cl223, cl228)
+print(data.frame(allr, rper))
+```
+```{r}
+# It can be that Reason 23 - Medical consultation be the reason why employees seek leave in cluster 2
+```
+```{r}
+# Lets do the same for cluster 4 just to see
+cl414 <- sum(cl4$Reason.for.absence == '14')
+cl414
+
+cl423 <- sum(cl4$Reason.for.absence == '23')
+cl423
+
+cl428 <- sum(cl4$Reason.for.absence == '28')
+cl428
+
+# total
+total423 <- sum(absent1$Reason.for.absence == '23')
+total414 <- sum(absent1$Reason.for.absence == '14')
+total428 <- sum(absent1$Reason.for.absence == '28')
+
+#cluster unjustified absenses
+cl414 <- cl414/total414*100
+cl423 <- cl423/total423*100
+cl428 <- cl428/total428*100
+
+#print cluster unjustified absenses percentage
+allr4 <- c("Reason 14","Reason 23", "Reason 28")
+rper4 <- c(cl414, cl423, cl428)
+print(data.frame(allr4, rper4))
+```
+
+```{r}
+# Reason of unjustified absense is much higer than dental consultation (28)
+```
+
